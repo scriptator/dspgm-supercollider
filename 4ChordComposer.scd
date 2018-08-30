@@ -73,8 +73,13 @@ Part 3: Generate the song
 */
 
 // scales
+// definitions
+(
 ~dur = [0,2,4,5,7,9,11];
 ~moll = [0,2,3,5,7,8,10];
+~startOctave = 4;
+~harmonies = [[0,2,-2,3], [0,5,3,4], [7,5,3,4]];
+)
 
 (
 b = Pbind(
@@ -96,45 +101,41 @@ b = Pbind(
 b.play
 )
 
-// generate chords
-
-~scale = ~dur;
-~startOctave = 4;
-
-~harmony = [0,2,-1,3];
-~harmony = [0,5,3,4];
-~harmony = [7,5,3,4];
-
-~arpeggio = [1,3,5,8] - 1;
-
 // as a function
 (
-var startPitch;
-var shiftedScale;
 var bpm = (100..200).choose;
 var clock = TempoClock.new;
+var harmony = ~harmonies.choose;
+var arpeggio = Array.fill(8, {[0,2,4,7].choose;});
+
+var scale = [~dur, ~moll].choose;
+var startPitch = (0..7).choose;
+var shiftedScale = scale + startPitch;
+
+// further declarations
+var arpeggioRow, arpeggioChordProgression, bassRow;
+
 clock.tempo_(bpm/60);
 
-startPitch = (0..7).choose;
-shiftedScale = ~scale + startPitch;
-
-~arpeggioRow = Pbind(
+arpeggioRow = Pbind(
 	\scale, shiftedScale,
-	\degree, Pseq(~arpeggio),
+	\degree, Pseq(arpeggio),
 	\octave, ~startOctave,
+	\dur, 0.5,
+	\instrument, \default
 );
 
-~arpeggioChordProgression = Paddp(\degree, Pseq(~harmony, inf), ~arpeggioRow);
-~arpeggioChordProgression.play(clock);
+arpeggioChordProgression = Paddp(\degree, Pseq(harmony, inf), arpeggioRow);
+arpeggioChordProgression.play(clock);
 
-~bassRow = Pbind(
+bassRow = Pbind(
 	\scale, shiftedScale,
-	\degree, Pseq(~harmony, inf),
+	\degree, Pseq(harmony, inf),
 	\octave, ~startOctave - 2,
 	\dur, 4,
 	\instrument, \ebass,
 	\amp, 0.6
 );
-~bassRow.play(clock)
+bassRow.play(clock)
 )
 
