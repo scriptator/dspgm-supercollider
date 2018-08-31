@@ -78,9 +78,10 @@ Part 3: Generate the song
 ~dur = [0,2,4,5,7,9,11];
 ~moll = [0,2,3,5,7,8,10];
 ~startOctave = 4;
-~harmonies = [[0,2,-2,3], [0,5,3,4], [7,5,3,4]];
+~harmonies = [[0,2,-2,3], [0,5,3,4], [7,5,3,4], [0,-3,-2,-4]];
 )
 
+// Test dur an moll scales
 (
 b = Pbind(
 	\scale, ~dur,
@@ -90,7 +91,6 @@ b = Pbind(
 );
 b.play
 )
-
 (
 b = Pbind(
 	\scale, ~moll,
@@ -103,7 +103,7 @@ b.play
 
 // as a function
 (
-var bpm = (100..200).choose;
+var bpm = (120..180).choose;
 var clock = TempoClock.new;
 var harmony = ~harmonies.choose;
 var arpeggio = Array.fill(8, {[0,2,4,7].choose;});
@@ -122,6 +122,7 @@ arpeggioRow = Pbind(
 	\degree, Pseq(arpeggio),
 	\octave, ~startOctave,
 	\dur, 0.5,
+	\amp, 0.125,
 	\instrument, \default
 );
 
@@ -131,10 +132,10 @@ arpeggioChordProgression.play(clock);
 bassRow = Pbind(
 	\scale, shiftedScale,
 	\degree, Pseq(harmony, inf),
-	\octave, ~startOctave - 2,
+	\octave, ~startOctave - 1,
 	\dur, 4,
-	\instrument, \ebass,
-	\amp, 0.6
+	\instrument, \default,
+	\amp, 0.7
 );
 bassRow.play(clock)
 )
