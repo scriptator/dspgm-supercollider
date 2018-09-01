@@ -77,8 +77,8 @@ Part 3: Generate the song
 (
 ~dur = [0,2,4,5,7,9,11];
 ~moll = [0,2,3,5,7,8,10];
-~startOctave = 5;
-~harmonies = [[0,2,-2,3], [0,5,3,4], [7,5,3,4], [0,-3,-2,-4]];
+~startOctave = 4;
+~harmonies = [[0,2,-2,3], [0,5,3,4], [0,-2,-4,-3], [0,-3,-2,-4]];
 )
 
 // Test dur an moll scales
@@ -108,15 +108,13 @@ var clock = TempoClock.new;
 var harmony = ~harmonies.choose;
 var arpeggio = Array.fill(8, {[0,2,4,7].choose;});
 
+// choose a random scale type and any of the 12 positions of the scale
 var scale = [~dur, ~moll].choose;
-var startPitch = (-3..4).choose;
+var startPitch = (0..11).choose + 5;
 var shiftedScale = scale + startPitch;
 
 // further declarations
 var arpeggioRow, arpeggioChordProgression, bassRow, melody, melodyRow;
-
-// temporarily fix the scale
-// harmony = [0,-3,-2,-4];
 
 // first try to do a melody
 melody = {
@@ -140,9 +138,8 @@ arpeggioRow = Pbind(
 	\instrument, \sinegrain
 );
 
-
 // play all the stuff
-Server.default.record;
+// Server.default.record;
 arpeggioChordProgression = Paddp(\degree, Pseq(harmony, inf), arpeggioRow);
 arpeggioChordProgression.play(clock);
 
