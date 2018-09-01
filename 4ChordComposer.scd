@@ -56,6 +56,40 @@ b = Pbind(
 b.play
 )
 
+(
+~generateMelody = {
+	|harmony, repetitions=1|
+	var melody = [];
+	var rhythm = [];
+
+	// note values of a 4 measure phrase: 2 means 1/2, 8 means 1/8
+	var rhythmBase = [2, 2, 4, 4, 4, 4, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8].reciprocal;
+
+	repetitions.do{
+		// scramble the note values of a 4 measure phrase
+		var curRhythm = rhythmBase.scramble;
+
+		// determine the number of notes in each measure
+		var numNotesInMeasures = {
+			var sum = 0;
+			var res = [];
+			curRhythm.do({ |note, i| sum = sum + note; if (sum.trunc > res.size) {res = res.add(i+1)}});
+			res.differentiate;
+		}.();
+		rhythm = rhythm ++ curRhythm;
+
+		// for each measure, select notes which fit with a high probability to the current chord
+		harmony.size.do{|i|
+			var probs = [3,1,3,1,3,1,1].rotate(harmony[i]);
+			var newMeasure = Array.fill(numNotesInMeasures[i], {(0..6).wchoose(probs.normalizeSum)});
+			melody = melody ++ newMeasure;
+		};
+	};
+	[melody, rhythm];
+})
+~generateMelody.([1,2,3,4], 1)
+
+
 // as a function
 (
 var bpm = (120..180).choose;
@@ -69,18 +103,12 @@ var startPitch = (0..11).choose + 5;
 var shiftedScale = scale + startPitch;
 
 // further declarations
-var arpeggioRow, arpeggioChordProgression, bassRow, melody, melodyRow;
+var arpeggioRow, arpeggioChordProgression, bassRow, melodyRow;
 
-// first try to do a melody
-melody = {
-	var melody = [];
-	harmony.size.do{|i|
-		var probs = [3,1,3,1,3,1,1].rotate(harmony[i]);
-		var newMeasure = Array.fill(8, {(0..6).wchoose(probs.normalizeSum)});
-		melody = melody ++ newMeasure;
-	};
-	melody;
-}.();
+// choose verse and chorus melodies - build song based on them
+var verse = ~generateMelody.(harmony, repetitions: 1);
+var chorus = ~generateMelody.(harmony, repetitions: 2);
+var numRepetitions = 1;
 
 clock.tempo_(bpm/60);
 
@@ -98,12 +126,12 @@ Part 3: Play it!
 */
 
 // Server.default.record;
-arpeggioChordProgression = Paddp(\degree, Pseq(harmony, inf), arpeggioRow);
+arpeggioChordProgression = Paddp(\degree, Pseq(harmony, numRepetitions * 4), arpeggioRow);
 arpeggioChordProgression.play(clock);
 
 bassRow = Pbind(
 	\scale, shiftedScale,
-	\degree, Pseq(harmony, inf),
+	\degree, Pseq([Pseq(harmony, numRepetitions * 4), harmony[0]]),
 	\octave, ~startOctave - 1,
 	\dur, 4,
 	\instrument, \default,
@@ -113,9 +141,9 @@ bassRow.play(clock);
 
 melodyRow = Pbind(
 	\scale, shiftedScale,
-	\degree, Pseq(melody),
+	\degree, Pseq([Pseq(verse[0], 2), Pseq(chorus[0])], numRepetitions),
 	\octave, ~startOctave + 1,
-	\dur, 0.5,
+	\dur, Pseq([Pseq(verse[1], 2), Pseq(chorus[1])] * 4, numRepetitions),
 	\amp, 0.125,
 	\instrument, \default
 );
