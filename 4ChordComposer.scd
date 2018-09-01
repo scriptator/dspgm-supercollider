@@ -92,10 +92,10 @@ b.play
 
 // as a function
 (
-var bpm = (120..180).choose;
+var bpm = (100..130).choose;
 var clock = TempoClock.new;
 var harmony = ~harmonies.choose;
-var arpeggio = Array.fill(8, {[0,2,4,7].choose;});
+var arpeggio = Array.fill(6, {[0,2,4,7].choose;});
 
 // choose a random scale type and any of the 12 positions of the scale
 var scale = [~dur, ~moll].choose;
@@ -116,7 +116,7 @@ arpeggioRow = Pbind(
 	\scale, shiftedScale,
 	\degree, Pseq(arpeggio),
 	\octave, ~startOctave,
-	\dur, 0.5,
+	\dur, Pseq([1,1,0.5,0.5,0.5,0.5].scramble),
 	\amp, 0.125,
 	\instrument, \sinegrain
 );
