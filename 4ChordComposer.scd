@@ -77,7 +77,7 @@ Part 3: Generate the song
 (
 ~dur = [0,2,4,5,7,9,11];
 ~moll = [0,2,3,5,7,8,10];
-~startOctave = 4;
+~startOctave = 5;
 ~harmonies = [[0,2,-2,3], [0,5,3,4], [7,5,3,4], [0,-3,-2,-4]];
 )
 
@@ -109,11 +109,25 @@ var harmony = ~harmonies.choose;
 var arpeggio = Array.fill(8, {[0,2,4,7].choose;});
 
 var scale = [~dur, ~moll].choose;
-var startPitch = (0..7).choose;
+var startPitch = (-3..4).choose;
 var shiftedScale = scale + startPitch;
 
 // further declarations
-var arpeggioRow, arpeggioChordProgression, bassRow;
+var arpeggioRow, arpeggioChordProgression, bassRow, melody, melodyRow;
+
+// temporarily fix the scale
+// harmony = [0,-3,-2,-4];
+
+// first try to do a melody
+melody = {
+	var melody = [];
+	harmony.size.do{|i|
+		var probs = [3,1,3,1,3,1,1].rotate(harmony[i]);
+		var newMeasure = Array.fill(8, {(0..6).wchoose(probs.normalizeSum)});
+		melody = melody ++ newMeasure;
+	};
+	melody;
+}.();
 
 clock.tempo_(bpm/60);
 
@@ -123,9 +137,12 @@ arpeggioRow = Pbind(
 	\octave, ~startOctave,
 	\dur, 0.5,
 	\amp, 0.125,
-	\instrument, \default
+	\instrument, \sinegrain
 );
 
+
+// play all the stuff
+Server.default.record;
 arpeggioChordProgression = Paddp(\degree, Pseq(harmony, inf), arpeggioRow);
 arpeggioChordProgression.play(clock);
 
@@ -135,8 +152,19 @@ bassRow = Pbind(
 	\octave, ~startOctave - 1,
 	\dur, 4,
 	\instrument, \default,
-	\amp, 0.7
+	\amp, 0.25
 );
-bassRow.play(clock)
+bassRow.play(clock);
+
+melodyRow = Pbind(
+	\scale, shiftedScale,
+	\degree, Pseq(melody),
+	\octave, ~startOctave + 1,
+	\dur, 0.5,
+	\amp, 0.125,
+	\instrument, \default
+);
+melodyRow.play(clock);
+Server.default.stopRecording;
 )
 
