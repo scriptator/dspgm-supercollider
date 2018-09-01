@@ -1,3 +1,5 @@
+// https://gist.github.com/1161256
+
 SynthDef(\my_synth, {|dur = 1.0, amp = 1.0, freq = 440|
 	var env = EnvGen.ar(Env.new([1, 0.1, 0], [0.06, dur - 0.06]), doneAction: 2);
 	Out.ar([0, 1], SinOsc.ar([freq * 0.995, freq * 1.005], 0, env * amp))
