@@ -58,7 +58,7 @@ b.play
 
 (
 ~generateMelody = {
-	|harmony, repetitions=1|
+	|harmony, probs, repetitions=1, octaveProbability=0.5|
 	var melody = [];
 	var rhythm = [];
 
@@ -80,8 +80,20 @@ b.play
 
 		// for each measure, select notes which fit with a high probability to the current chord
 		harmony.size.do{|i|
-			var probs = [3,1,3,1,3,1,1].rotate(harmony[i]);
-			var newMeasure = Array.fill(numNotesInMeasures[i], {(0..6).wchoose(probs.normalizeSum)});
+			var curProbs = probs.rotate(harmony[i]);
+			var newMeasure = Array.fill(numNotesInMeasures[i], {(0..6).wchoose(curProbs.normalizeSum)});
+			newMeasure.do({ |note, i|
+				switch (note,
+					0, {if (i > 0) {
+							// if current note is root and note before was at >= the 4th degree, use the root note one octave higher
+							if ((newMeasure[i-1] > 0) && (newMeasure[i-1] < 4) && (octaveProbability.coin)) {
+								newMeasure[i] = 7;
+							}
+						}
+					// always play the 8th degree after a seventh
+					}, 6, {if (i < (newMeasure.size - 1)) {newMeasure[i+1] = 7}}
+				);
+			});
 			melody = melody ++ newMeasure;
 		};
 	};
@@ -89,12 +101,12 @@ b.play
 })
 ~generateMelody.([1,2,3,4], 1)
 
-
 // as a function
 (
 var bpm = (100..130).choose;
 var clock = TempoClock.new;
-var harmony = ~harmonies.choose;
+var verseHarmony = ~harmonies.choose;
+var chorusHarmony = ~harmonies.choose;
 var arpeggio = Array.fill(6, {[0,2,4,7].choose;});
 
 // choose a random scale type and any of the 12 positions of the scale
@@ -106,9 +118,9 @@ var shiftedScale = scale + startPitch;
 var arpeggioRow, arpeggioChordProgression, bassRow, melodyRow;
 
 // choose verse and chorus melodies - build song based on them
-var verse = ~generateMelody.(harmony, repetitions: 1);
-var chorus = ~generateMelody.(harmony, repetitions: 2);
-var numRepetitions = 1;
+var verse = ~generateMelody.(verseHarmony, repetitions: 1, probs: [3,1,3,1,3,1,0.5]);
+var chorus = ~generateMelody.(chorusHarmony, repetitions: 2, probs: [4,0,3,1,4,1,0]);
+var numRepetitions = 2;
 
 clock.tempo_(bpm/60);
 
@@ -117,7 +129,7 @@ arpeggioRow = Pbind(
 	\degree, Pseq(arpeggio),
 	\octave, ~startOctave,
 	\dur, Pseq([1,1,0.5,0.5,0.5,0.5].scramble),
-	\amp, 0.125,
+	\amp, 0.15,
 	\instrument, \sinegrain
 );
 
@@ -126,12 +138,14 @@ Part 3: Play it!
 */
 
 // Server.default.record;
-arpeggioChordProgression = Paddp(\degree, Pseq(harmony, numRepetitions * 4), arpeggioRow);
+arpeggioChordProgression = Paddp(
+	\degree, Pseq([Pseq(verseHarmony, 2), Pseq(chorusHarmony, 2)], numRepetitions),
+	arpeggioRow);
 arpeggioChordProgression.play(clock);
 
 bassRow = Pbind(
 	\scale, shiftedScale,
-	\degree, Pseq([Pseq(harmony, numRepetitions * 4), harmony[0]]),
+	\degree, Pseq([Pseq([Pseq(verseHarmony, 2), Pseq(chorusHarmony, 2)], numRepetitions), chorusHarmony[0]]),
 	\octave, ~startOctave - 1,
 	\dur, 4,
 	\instrument, \default,
