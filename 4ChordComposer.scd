@@ -58,8 +58,9 @@ SynthDef(\sinegrain,
 
 		// for each measure, select notes which fit with a high probability to the current chord
 		harmony.size.do{|i|
+			// rotate the probabilities such that they fit to the current chord
 			var curProbs = probs.rotate(harmony[i]);
-			var newMeasure = Array.fill(numNotesInMeasures[i], {(0..6).wchoose(curProbs.normalizeSum)});
+			var newMeasure = Array.fill(numNotesInMeasures[i], {(0..6).wchoose(curProbs)});
 
 			// some heuristics to make the melody sound better
 			newMeasure.do({ |note, i|
@@ -135,9 +136,10 @@ var chorusHarmony = harmonies[1];
 var bridgeHarmony = harmonies[2];
 
 // choose verse and chorus melodies - build song based on them
-var verse = ~generateMelody.(verseHarmony, numPhrases: 1, probs: [3,1,3,1,3,1,0.5]);
-var chorus = ~generateMelody.(chorusHarmony, numPhrases: 1, probs: [4,0,3,1,4,1,0]);
-var bridge = ~generateMelody.(bridgeHarmony, numPhrases: 2, probs: [3,1,3,1,3,1,0.5]);
+// probs are the probabilities for each of the 7 notes of the scale to be used in the melody
+var verse = ~generateMelody.(verseHarmony, numPhrases: 1, probs: [3,1,3,1,3,1,0.5].normalizeSum);
+var chorus = ~generateMelody.(chorusHarmony, numPhrases: 1, probs: [4,0,3,1,4,1,0].normalizeSum);
+var bridge = ~generateMelody.(bridgeHarmony, numPhrases: 2, probs: [3,1,3,1,3,1,0.5].normalizeSum);
 
 var arpeggio = Array.fill(6, {[0,2,4,7].choose;});
 var arpeggioRhythm = Pseq([1,1,0.5,0.5,0.5,0.5].scramble);
