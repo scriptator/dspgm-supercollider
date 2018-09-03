@@ -27,36 +27,20 @@ SynthDef(\sinegrain,
 Part 2: Generate the song
 */
 
-// scales
-// definitions
+// some global definitions
 (
 ~dur = [0,2,4,5,7,9,11];
 ~moll = [0,2,3,5,7,8,10];
 ~startOctave = 4;
+
+// number of times the verse and chorus will be repeated before the bridge
 ~numRepetitions = 2;
+
+// these are the available chord progressions for four chord songs
 ~harmonies = [[0,2,-2,3], [0,5,3,4], [0,-2,-4,-3], [0,-3,-2,-4]];
 )
 
-// Test dur and moll scales
-(
-b = Pbind(
-	\scale, ~dur,
-	\degree, Pseq((0..7)),
-	\octave, 5,
-	\dur, 0.25
-);
-b.play
-)
-(
-b = Pbind(
-	\scale, ~moll,
-	\degree, Pseq((0..7)),
-	\octave, 5,
-	\dur, 0.25,
-);
-b.play
-)
-
+// function definitions
 (
 ~generateMelody = {
 	|harmony, probs, numPhrases=1, octaveProbability=0.5|
@@ -98,8 +82,46 @@ b.play
 			melody = melody ++ newMeasure;
 		};
 	};
-	[melody, rhythm];
-})
+	// multiply by four to make the quarter note the base unit
+	[melody, rhythm * 4];
+};
+
+~playSongPart = {
+	|scale, bassNotes, arpeggioNotes, arpeggioRhythm, melodyNotes, melodyRhythm, clock|
+
+	var bassRow = Pbind(
+		\scale, scale,
+		\degree, bassNotes,
+		\octave, ~startOctave - 1,
+		\dur, 4,
+		\instrument, \default,
+		\amp, 0.25
+	);
+
+	var arpeggioRow = Pbind(
+		\scale, scale,
+		\degree, arpeggioNotes,
+		\octave, ~startOctave,
+		\dur, arpeggioRhythm,
+		\amp, 0.15,
+		\instrument, \sinegrain
+	);
+	var arpeggioChordProgression = Paddp(\degree, bassNotes, arpeggioRow);
+
+	var melodyRow = Pbind(
+		\scale, scale,
+		\degree, melodyNotes,
+		\octave, ~startOctave + 1,
+		\dur, melodyRhythm,
+		\amp, 0.125,
+		\instrument, \default
+	);
+
+	bassRow.play(clock);
+	melodyRow.play(clock);
+	arpeggioChordProgression.play(clock);
+};
+)
 
 // as a function
 (
@@ -120,9 +142,7 @@ var bridge = ~generateMelody.(bridgeHarmony, numPhrases: 2, probs: [3,1,3,1,3,1,
 var arpeggio = Array.fill(6, {[0,2,4,7].choose;});
 var arpeggioRhythm = Pseq([1,1,0.5,0.5,0.5,0.5].scramble);
 
-
-// further declarations
-var arpeggioRow, arpeggioChordProgression, bassRow, melodyRow;
+// further declarations, to be defined below
 var scale, bridgeScale, shiftedScale, shiftedBridgeScale;
 
 // choose a random start pitch – defines the starting point of the scale
@@ -144,115 +164,46 @@ clock.tempo_(bpm/60);
 Part 3: Play it!
 */
 
-Server.default.record;
+// Server.default.record;
 
 // play verse and chorus
-
-arpeggioRow = Pbind(
-	\scale, shiftedScale,
-	\degree, Pseq(arpeggio),
-	\octave, ~startOctave,
-	\dur, arpeggioRhythm,
-	\amp, 0.15,
-	\instrument, \sinegrain
+"Calling Play for Verse and Chorus".postln;
+~playSongPart.(
+	scale: shiftedScale,
+	bassNotes: Pseq([Pseq(verseHarmony, 2), Pseq(chorusHarmony, 2)], ~numRepetitions),
+	arpeggioNotes: Pseq(arpeggio),
+	arpeggioRhythm: arpeggioRhythm,
+	melodyNotes: Pseq([Pseq(verse[0], 2), Pseq(chorus[0], 2)], ~numRepetitions),
+	melodyRhythm: Pseq([Pseq(verse[1], 2), Pseq(chorus[1], 2)], ~numRepetitions),
+	clock: clock
 );
-
-arpeggioChordProgression = Paddp(
-	\degree, Pseq([Pseq(verseHarmony, 2), Pseq(chorusHarmony, 2)], ~numRepetitions),
-	arpeggioRow);
-arpeggioChordProgression.play(clock);
-
-~bassRow = Pbind(
-	\scale, shiftedScale,
-	\degree, Pseq([Pseq(verseHarmony, 2), Pseq(chorusHarmony, 2)], ~numRepetitions),
-	\octave, ~startOctave - 1,
-	\dur, 4,
-	\instrument, \default,
-	\amp, 0.25
-);
-~bassRow.play(clock);
-
-melodyRow = Pbind(
-	\scale, shiftedScale,
-	\degree, Pseq([Pseq(verse[0], 2), Pseq(chorus[0], 2)], ~numRepetitions),
-	\octave, ~startOctave + 1,
-	\dur, Pseq([Pseq(verse[1], 2), Pseq(chorus[1], 2)] * 4, ~numRepetitions),
-	\amp, 0.125,
-	\instrument, \default
-);
-melodyRow.play(clock);
-
-//  (TODO remove code repetition)
 
 // after 16 measures with optional repetitions: play bridge
 clock.schedAbs(clock.nextTimeOnGrid(4 * 16 * ~numRepetitions, -0.001), {
-    Pbind(\scale, shiftedBridgeScale,
-		\degree, Pseq(bridgeHarmony, 2),
-		\octave, ~startOctave - 1,
-		\dur, 4,
-		\instrument, \default,
-		\amp, 0.25).play(clock);
-
-	arpeggioRow = Pbind(
-	\scale, shiftedBridgeScale,
-	\degree, Pseq(arpeggio),
-	\octave, ~startOctave,
-	\dur, arpeggioRhythm,
-	\amp, 0.15,
-	\instrument, \sinegrain
+	"Calling Play for Bridge".postln;
+	~playSongPart.(
+		scale: shiftedBridgeScale,
+		bassNotes: Pseq(bridgeHarmony, 2),
+		arpeggioNotes: Pseq(arpeggio),
+		arpeggioRhythm: arpeggioRhythm,
+		melodyNotes: Pseq(bridge[0]),
+		melodyRhythm: Pseq(bridge[1]),
+		clock: clock
 	);
-
-	arpeggioChordProgression = Paddp(
-		\degree, Pseq(bridgeHarmony, 2),
-		arpeggioRow);
-	arpeggioChordProgression.play(clock);
-
-	// play bridge melody
-	Pbind(
-		\scale, shiftedBridgeScale,
-		\degree, Pseq(bridge[0]),
-		\octave, ~startOctave + 1,
-		\dur, Pseq(bridge[1] * 4),
-		\amp, 0.125,
-		\instrument, \default
-	).play(clock);
 });
 
 // after the bridge (another 8 measures): play 2 times the chorus
 clock.schedAbs(clock.nextTimeOnGrid(4 * (16 * ~numRepetitions + 8), -0.001), {
-	~bassRow = Pbind(
-		\scale, shiftedScale,
-		\degree, Pseq([Pseq(chorusHarmony, 4), chorusHarmony[0]]),
-		\octave, ~startOctave - 1,
-		\dur, 4,
-		\instrument, \default,
-		\amp, 0.25
+	"Calling Play for Outro".postln;
+	~playSongPart.(
+		scale: shiftedScale,
+		bassNotes: Pseq(chorusHarmony, 4),
+		arpeggioNotes: Pseq(arpeggio),
+		arpeggioRhythm: arpeggioRhythm,
+		melodyNotes: Pseq(chorus[0], 4),
+		melodyRhythm: Pseq(chorus[1], 4),
+		clock: clock
 	);
-	~bassRow.play(clock);
-
-	arpeggioRow = Pbind(
-		\scale, shiftedScale,
-		\degree, Pseq(arpeggio),
-		\octave, ~startOctave,
-		\dur, arpeggioRhythm,
-		\amp, 0.15,
-		\instrument, \sinegrain
-	);
-
-	arpeggioChordProgression = Paddp(
-		\degree, Pseq(chorusHarmony, 4),
-		arpeggioRow);
-	arpeggioChordProgression.play(clock);
-
-	melodyRow = Pbind(
-		\scale, shiftedScale,
-		\degree, Pseq(chorus[0], 4),
-		\octave, ~startOctave + 1,
-		\dur, Pseq(chorus[1] * 4, 4),
-		\amp, 0.125,
-		\instrument, \default
-	);
-	melodyRow.play(clock);
 });
 
 // when song finishes --> stop recording
