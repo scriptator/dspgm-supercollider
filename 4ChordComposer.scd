@@ -33,6 +33,7 @@ Part 2: Generate the song
 ~dur = [0,2,4,5,7,9,11];
 ~moll = [0,2,3,5,7,8,10];
 ~startOctave = 4;
+~numRepetitions = 2;
 ~harmonies = [[0,2,-2,3], [0,5,3,4], [0,-2,-4,-3], [0,-3,-2,-4]];
 )
 
@@ -58,14 +59,14 @@ b.play
 
 (
 ~generateMelody = {
-	|harmony, probs, repetitions=1, octaveProbability=0.5|
+	|harmony, probs, numPhrases=1, octaveProbability=0.5|
 	var melody = [];
 	var rhythm = [];
 
 	// note values of a 4 measure phrase: 2 means 1/2, 8 means 1/8
 	var rhythmBase = [2, 2, 4, 4, 4, 4, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8].reciprocal;
 
-	repetitions.do{
+	numPhrases.do{
 		// scramble the note values of a 4 measure phrase
 		var curRhythm = rhythmBase.scramble;
 
@@ -99,69 +100,163 @@ b.play
 	};
 	[melody, rhythm];
 })
-~generateMelody.([1,2,3,4], 1)
 
 // as a function
 (
-var bpm = (100..130).choose;
+var bpm = 180; // (100..130).choose;
 var clock = TempoClock.new;
-var verseHarmony = ~harmonies.choose;
-var chorusHarmony = ~harmonies.choose;
-var arpeggio = Array.fill(6, {[0,2,4,7].choose;});
 
-// choose a random scale type and any of the 12 positions of the scale
-var scale = [~dur, ~moll].choose;
-var startPitch = (0..11).choose + 5;
-var shiftedScale = scale + startPitch;
+// choose three chord progressions for the three parts of the song
+var harmonies = ~harmonies.scramble;
+var verseHarmony = harmonies[0];
+var chorusHarmony = harmonies[1];
+var bridgeHarmony = harmonies[2];
+
+// choose verse and chorus melodies - build song based on them
+var verse = ~generateMelody.(verseHarmony, numPhrases: 1, probs: [3,1,3,1,3,1,0.5]);
+var chorus = ~generateMelody.(chorusHarmony, numPhrases: 1, probs: [4,0,3,1,4,1,0]);
+var bridge = ~generateMelody.(bridgeHarmony, numPhrases: 2, probs: [3,1,3,1,3,1,0.5]);
+
+var arpeggio = Array.fill(6, {[0,2,4,7].choose;});
+var arpeggioRhythm = Pseq([1,1,0.5,0.5,0.5,0.5].scramble);
+
 
 // further declarations
 var arpeggioRow, arpeggioChordProgression, bassRow, melodyRow;
+var scale, bridgeScale, shiftedScale, shiftedBridgeScale;
 
-// choose verse and chorus melodies - build song based on them
-var verse = ~generateMelody.(verseHarmony, repetitions: 1, probs: [3,1,3,1,3,1,0.5]);
-var chorus = ~generateMelody.(chorusHarmony, repetitions: 2, probs: [4,0,3,1,4,1,0]);
-var numRepetitions = 2;
+// choose a random start pitch – defines the starting point of the scale
+var startPitch = (0..11).choose + 5;
+
+if (0.5.coin) {
+	scale = ~dur;
+	bridgeScale = ~moll - 3;  // go to parallel moll scale
+} /*else*/ {
+	scale = ~moll;
+	bridgeScale = ~dur + 3;  // go to parallel dur scale
+};
+shiftedScale = scale + startPitch;
+shiftedBridgeScale = bridgeScale + startPitch;
 
 clock.tempo_(bpm/60);
-
-arpeggioRow = Pbind(
-	\scale, shiftedScale,
-	\degree, Pseq(arpeggio),
-	\octave, ~startOctave,
-	\dur, Pseq([1,1,0.5,0.5,0.5,0.5].scramble),
-	\amp, 0.15,
-	\instrument, \sinegrain
-);
 
 /**
 Part 3: Play it!
 */
 
-// Server.default.record;
+Server.default.record;
+
+// play verse and chorus
+
+arpeggioRow = Pbind(
+	\scale, shiftedScale,
+	\degree, Pseq(arpeggio),
+	\octave, ~startOctave,
+	\dur, arpeggioRhythm,
+	\amp, 0.15,
+	\instrument, \sinegrain
+);
+
 arpeggioChordProgression = Paddp(
-	\degree, Pseq([Pseq(verseHarmony, 2), Pseq(chorusHarmony, 2)], numRepetitions),
+	\degree, Pseq([Pseq(verseHarmony, 2), Pseq(chorusHarmony, 2)], ~numRepetitions),
 	arpeggioRow);
 arpeggioChordProgression.play(clock);
 
-bassRow = Pbind(
+~bassRow = Pbind(
 	\scale, shiftedScale,
-	\degree, Pseq([Pseq([Pseq(verseHarmony, 2), Pseq(chorusHarmony, 2)], numRepetitions), chorusHarmony[0]]),
+	\degree, Pseq([Pseq(verseHarmony, 2), Pseq(chorusHarmony, 2)], ~numRepetitions),
 	\octave, ~startOctave - 1,
 	\dur, 4,
 	\instrument, \default,
 	\amp, 0.25
 );
-bassRow.play(clock);
+~bassRow.play(clock);
 
 melodyRow = Pbind(
 	\scale, shiftedScale,
-	\degree, Pseq([Pseq(verse[0], 2), Pseq(chorus[0])], numRepetitions),
+	\degree, Pseq([Pseq(verse[0], 2), Pseq(chorus[0], 2)], ~numRepetitions),
 	\octave, ~startOctave + 1,
-	\dur, Pseq([Pseq(verse[1], 2), Pseq(chorus[1])] * 4, numRepetitions),
+	\dur, Pseq([Pseq(verse[1], 2), Pseq(chorus[1], 2)] * 4, ~numRepetitions),
 	\amp, 0.125,
 	\instrument, \default
 );
 melodyRow.play(clock);
-Server.default.stopRecording;
-)
 
+//  (TODO remove code repetition)
+
+// after 16 measures with optional repetitions: play bridge
+clock.schedAbs(clock.nextTimeOnGrid(4 * 16 * ~numRepetitions, -0.001), {
+    Pbind(\scale, shiftedBridgeScale,
+		\degree, Pseq(bridgeHarmony, 2),
+		\octave, ~startOctave - 1,
+		\dur, 4,
+		\instrument, \default,
+		\amp, 0.25).play(clock);
+
+	arpeggioRow = Pbind(
+	\scale, shiftedBridgeScale,
+	\degree, Pseq(arpeggio),
+	\octave, ~startOctave,
+	\dur, arpeggioRhythm,
+	\amp, 0.15,
+	\instrument, \sinegrain
+	);
+
+	arpeggioChordProgression = Paddp(
+		\degree, Pseq(bridgeHarmony, 2),
+		arpeggioRow);
+	arpeggioChordProgression.play(clock);
+
+	// play bridge melody
+	Pbind(
+		\scale, shiftedBridgeScale,
+		\degree, Pseq(bridge[0]),
+		\octave, ~startOctave + 1,
+		\dur, Pseq(bridge[1] * 4),
+		\amp, 0.125,
+		\instrument, \default
+	).play(clock);
+});
+
+// after the bridge (another 8 measures): play 2 times the chorus
+clock.schedAbs(clock.nextTimeOnGrid(4 * (16 * ~numRepetitions + 8), -0.001), {
+	~bassRow = Pbind(
+		\scale, shiftedScale,
+		\degree, Pseq([Pseq(chorusHarmony, 4), chorusHarmony[0]]),
+		\octave, ~startOctave - 1,
+		\dur, 4,
+		\instrument, \default,
+		\amp, 0.25
+	);
+	~bassRow.play(clock);
+
+	arpeggioRow = Pbind(
+		\scale, shiftedScale,
+		\degree, Pseq(arpeggio),
+		\octave, ~startOctave,
+		\dur, arpeggioRhythm,
+		\amp, 0.15,
+		\instrument, \sinegrain
+	);
+
+	arpeggioChordProgression = Paddp(
+		\degree, Pseq(chorusHarmony, 4),
+		arpeggioRow);
+	arpeggioChordProgression.play(clock);
+
+	melodyRow = Pbind(
+		\scale, shiftedScale,
+		\degree, Pseq(chorus[0], 4),
+		\octave, ~startOctave + 1,
+		\dur, Pseq(chorus[1] * 4, 4),
+		\amp, 0.125,
+		\instrument, \default
+	);
+	melodyRow.play(clock);
+});
+
+// when song finishes --> stop recording
+clock.schedAbs(clock.nextTimeOnGrid(4 * (16 * ~numRepetitions + 26), -0.001), {
+	Server.default.stopRecording;
+});
+)
