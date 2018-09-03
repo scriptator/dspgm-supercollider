@@ -2,17 +2,11 @@
 s.boot
 
 /**
-Part 1: Synthesizer Definitions
+Part 1: Synth, function and variable definitions
 */
 
 (
-SynthDef(\ploink, {
-	|freq=400, amp=0.5|
-	var sig = SinOsc.ar(freq, mul:amp);
-	var env = EnvGen.kr(Env.perc, doneAction:2);
-	Out.ar(0, sig * env);
-}).add;
-
+///////// Synthesizers /////////////
 
 // From PAddp documentation
 SynthDef(\sinegrain,
@@ -21,27 +15,26 @@ SynthDef(\sinegrain,
         env = EnvGen.kr(Env.perc(0.001, sustain), 1, doneAction: Done.freeSelf);
         Out.ar(out, SinOsc.ar(freq, 0, env * 0.1))
     }).add;
-)
 
-/**
-Part 2: Generate the song
-*/
 
-// some global definitions
-(
-~dur = [0,2,4,5,7,9,11];
-~moll = [0,2,3,5,7,8,10];
+
+///////// Global Variables /////////////
+
+~scales = Dictionary.with(*[
+	\major->[0,2,4,5,7,9,11],
+	\minor->[0,2,3,5,7,8,10]]);
 ~startOctave = 4;
+~noteNames = ["c", "des", "d", "es", "e", "f", "fis", "g", "as", "a", "b♭", "b"];
 
 // number of times the verse and chorus will be repeated before the bridge
 ~numRepetitions = 2;
 
 // these are the available chord progressions for four chord songs
 ~harmonies = [[0,2,-2,3], [0,5,3,4], [0,-2,-4,-3], [0,-3,-2,-4]];
-)
 
-// function definitions
-(
+
+
+///////// Functions /////////////
 ~generateMelody = {
 	|harmony, probs, numPhrases=1, octaveProbability=0.5|
 	var melody = [];
@@ -67,6 +60,8 @@ Part 2: Generate the song
 		harmony.size.do{|i|
 			var curProbs = probs.rotate(harmony[i]);
 			var newMeasure = Array.fill(numNotesInMeasures[i], {(0..6).wchoose(curProbs.normalizeSum)});
+
+			// some heuristics to make the melody sound better
 			newMeasure.do({ |note, i|
 				switch (note,
 					0, {if (i > 0) {
@@ -82,7 +77,8 @@ Part 2: Generate the song
 			melody = melody ++ newMeasure;
 		};
 	};
-	// multiply by four to make the quarter note the base unit
+
+	// multiply rhythm values by four to make the quarter note the base unit
 	[melody, rhythm * 4];
 };
 
@@ -123,9 +119,13 @@ Part 2: Generate the song
 };
 )
 
+/**
+Part 2: Randomly choose and generate all the stuff
+*/
+
 // as a function
 (
-var bpm = 180; // (100..130).choose;
+var bpm = (160..190).choose;
 var clock = TempoClock.new;
 
 // choose three chord progressions for the three parts of the song
@@ -143,28 +143,39 @@ var arpeggio = Array.fill(6, {[0,2,4,7].choose;});
 var arpeggioRhythm = Pseq([1,1,0.5,0.5,0.5,0.5].scramble);
 
 // further declarations, to be defined below
-var scale, bridgeScale, shiftedScale, shiftedBridgeScale;
+var scale, scaleName, bridgeScale, bridgeScaleName, bridgeShift, shiftedScale, shiftedBridgeScale;
 
 // choose a random start pitch – defines the starting point of the scale
 var startPitch = (0..11).choose + 5;
 
 if (0.5.coin) {
-	scale = ~dur;
-	bridgeScale = ~moll - 3;  // go to parallel moll scale
+	bridgeShift = -3;  // go to parallel minor scale
+	scaleName=\major;
+	bridgeScaleName = \minor;
 } /*else*/ {
-	scale = ~moll;
-	bridgeScale = ~dur + 3;  // go to parallel dur scale
+	bridgeShift = 3;  // go to parallel major scale
+	scaleName=\minor;
+	bridgeScaleName = \major;
 };
-shiftedScale = scale + startPitch;
-shiftedBridgeScale = bridgeScale + startPitch;
+shiftedScale = ~scales[scaleName] + startPitch;
+shiftedBridgeScale = ~scales[bridgeScaleName] + startPitch + bridgeShift;
 
 clock.tempo_(bpm/60);
+
+// print some of the interesting infos
+"".postln;
+postf("Tempo: % bpm\n", bpm);
+postf("Chosen chord progressions (in musical degrees): %, %, %\n", harmonies[0]+1, harmonies[1]+1, harmonies[2]+1);
+postf("Song is in % %, bridge is in % %\n",
+	~noteNames.wrapAt(startPitch), scaleName,
+	~noteNames.wrapAt(startPitch+bridgeShift), bridgeScaleName);
+"".postln;
 
 /**
 Part 3: Play it!
 */
 
-// Server.default.record;
+Server.default.record;
 
 // play verse and chorus
 "Calling Play for Verse and Chorus".postln;
